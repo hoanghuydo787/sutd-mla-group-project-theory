@@ -1,0 +1,162 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage[backend=biber,style=ieee]{biblatex}
+\addbibresource{references.bib}
+
+\title{Optical Character Recognition (OCR)}
+\author{Your Name}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Optical Character Recognition (OCR) converts text in images into machine-readable strings. Modern OCR is central to document digitization, search, automation, and accessibility, but robust performance remains challenging in noisy and unconstrained conditions. This report positions OCR in the broader machine learning and computer vision landscape, motivates the problem through a practical scenario, and explains a key conceptual pipeline using words, equations, and a compact system diagram. It also summarizes common evaluation metrics, limitations, and future directions, then concludes with references used in preparing the report.
+\end{abstract}
+
+\section{Introduction}
+OCR refers to the computational process of extracting text content from visual input such as scanned pages, photos of receipts, street scenes, and handwritten forms. In practical systems, OCR often includes three sub-problems: (i) text detection (where text is located), (ii) text recognition (which characters are present and in what order), and (iii) post-processing (language-aware correction and formatting).
+
+Applications include archive digitization, invoice and receipt parsing, number-plate reading, document search, and assistive technologies for visually impaired users. OCR is also an enabling front-end for downstream analytics and retrieval systems \cite{smith2007tesseract,mori1999ocrsurvey}.
+
+\subsection{Suggested Page Allocation (7--10 pages)}
+\begin{itemize}[leftmargin=*]
+    \item Abstract + Introduction: 1.0--1.5 pages
+    \item Context: 1.5--2.0 pages
+    \item Motivation: 1.0 page
+    \item Theory: 3.0--4.0 pages
+    \item Evaluation + Limitations/Future Work: 1.0--1.5 pages
+    \item Sources/References: 0.5 page
+\end{itemize}
+
+\section{Context}
+\subsection{Precedent Topics}
+OCR builds on earlier ideas in image processing and pattern recognition. Historically, systems used hand-crafted features and template matching, often with explicit segmentation of characters before classification \cite{mori1999ocrsurvey}. Later, statistical sequence models (e.g., Hidden Markov Models) and language modeling improved robustness to ambiguous visual evidence.
+
+With deep learning, representation learning replaced many hand-crafted components. Convolutional neural networks (CNNs) improved visual feature extraction, while recurrent and attention-based sequence models improved recognition from variable-width text images \cite{shi2016crnn,jaderberg2016reading}.
+
+\subsection{Successor Topics}
+Modern OCR is increasingly a subsystem rather than a final task. It feeds into higher-level document intelligence pipelines such as key information extraction, form understanding, legal/medical document analysis, and retrieval-augmented generation over scanned archives. End-to-end document AI models combine text, layout, and visual structure in a multimodal framework.
+
+\subsection{Tangential Topics}
+Related areas include:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Handwritten Text Recognition (HTR):} stronger variability in stroke style and character formation.
+    \item \textbf{Scene Text Recognition:} perspective distortion, motion blur, and cluttered backgrounds.
+    \item \textbf{Language-aware Correction:} spelling correction and constrained decoding that borrow from NLP.
+\end{itemize}
+
+\subsection{Historical Progression}
+At a high level, OCR has evolved from rule/template-based systems to deep end-to-end recognition \cite{mori1999ocrsurvey,smith2007tesseract,shi2016crnn,baek2019str}:
+\begin{enumerate}[leftmargin=*]
+    \item Character templates and engineered features.
+    \item Statistical sequence models with handcrafted preprocessing.
+    \item CNN-RNN hybrids (e.g., CRNN) and CTC-based training.
+    \item Attention and transformer-based recognizers with stronger language priors.
+\end{enumerate}
+
+\section{Motivation}
+Consider an expense-management workflow where employees submit mobile photos of receipts. The images are often noisy: text may be skewed, partially occluded, low contrast, or motion blurred. Vendor names can use stylized fonts, and currency/date formats vary by region.
+
+Without OCR, every receipt must be keyed in manually, creating delay and human error. With OCR, organizations can automatically extract fields such as merchant, date, and total amount, then route results into accounting systems. The engineering challenge is that recognition quality depends not only on character classification accuracy but also on detection quality, sequence alignment, and linguistic plausibility.
+
+This mix of high business impact and real-world noise explains why OCR remains both economically valuable and technically interesting.
+
+\section{Theory}
+This section explains a canonical OCR pipeline:
+\[
+\text{Image} \rightarrow \text{Preprocessing} \rightarrow \text{Text Detection} \rightarrow \text{Sequence Recognition} \rightarrow \text{Decoding}.
+\]
+
+\subsection{Pipeline Components}
+\textbf{Preprocessing:} geometric correction (deskewing), denoising, and contrast normalization improve downstream feature quality.
+
+\textbf{Text Detection:} a detector proposes text regions (lines/words) from the page or scene \cite{liao2020db}.
+
+\textbf{Sequence Recognition:} a recognizer maps each cropped text region to a sequence of character probabilities over time steps.
+
+\textbf{Decoding with Language Constraints:} final text is selected by combining visual likelihood and language priors.
+
+\subsection{Visual Encoding and Sequence Probabilities}
+Let input image crop be $X$. A feature extractor (typically CNN-based) produces a sequence of feature vectors:
+\[
+H = f_{\theta}(X) = (h_1, h_2, \ldots, h_T).
+\]
+A sequence model predicts a distribution over character vocabulary $\mathcal{V}$ plus a blank symbol at each step:
+\[
+P(\pi_t \mid X), \quad \pi_t \in \mathcal{V} \cup \{\varnothing\}, \quad t=1,\ldots,T.
+\]
+
+\subsection{CTC Objective}
+In OCR, alignment between time steps and target characters is usually unknown. Connectionist Temporal Classification (CTC) handles this by summing probabilities over all valid alignment paths \cite{graves2006ctc}. For a target string $y$, define $\mathcal{B}^{-1}(y)$ as all paths that collapse to $y$ after removing blanks and repeated symbols. Then:
+\[
+P(y \mid X) = \sum_{\pi \in \mathcal{B}^{-1}(y)} \prod_{t=1}^{T} P(\pi_t \mid X),
+\]
+and the training loss is:
+\[
+\mathcal{L}_{\text{CTC}} = -\log P(y \mid X).
+\]
+This allows end-to-end learning without character-level alignment labels.
+
+\subsection{Decoding}
+At inference, greedy decoding takes the most likely symbol per time step and collapses repeats/blanks. Beam search usually performs better by exploring multiple candidates and optionally using a language model (LM) \cite{shi2016crnn,shi2017aster}:
+\[
+\hat{y} = \arg\max_{y} \left[\log P_{\text{CTC}}(y \mid X) + \lambda \log P_{\text{LM}}(y) + \beta |y|\right],
+\]
+where $\lambda$ controls LM influence and $\beta$ can regularize sequence length.
+
+\subsection{Compact System Diagram}
+\begin{center}
+\fbox{
+\begin{minipage}{0.93\linewidth}
+\centering
+Input Image $\rightarrow$ Preprocessing $\rightarrow$ Detector $\rightarrow$ Crop/Line Features $\rightarrow$ Recognizer (CNN+Sequence Model) $\rightarrow$ CTC/Attention Decoding $\rightarrow$ Output Text
+\end{minipage}
+}
+\end{center}
+
+\section{Evaluation Snapshot}
+Common OCR metrics include:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Character Error Rate (CER):} normalized edit distance at character level.
+    \item \textbf{Word Error Rate (WER):} normalized edit distance at word level.
+    \item \textbf{Exact Match Accuracy:} fraction of predictions exactly equal to reference strings.
+\end{itemize}
+
+Let $S$, $D$, and $I$ be substitution, deletion, and insertion counts from edit distance, and let $N$ be reference length. Then:
+\[
+\text{CER} = \frac{S + D + I}{N}.
+\]
+
+\begin{table}[h]
+\centering
+\caption{Typical OCR Evaluation Summary}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Metric & Measures & Typical Use \\
+\midrule
+CER & Character-level errors & General recognition quality \\
+WER & Word-level errors & Readability and downstream parsing \\
+Exact Match & Full-string correctness & Strict field extraction \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Frequently used datasets include IAM (handwriting), ICDAR benchmarks (scene/document text), and large synthetic corpora used for pretraining \cite{baek2019str,li2021trba}.
+
+\section{Limitations and Future Directions}
+Despite major progress, OCR systems still face challenges with severe blur, unusual scripts, low-resource languages, complex page layouts, and domain shift between training and deployment data.
+
+Current trends include transformer-based recognizers, stronger multimodal document models, synthetic data engines for rare scripts, and tighter integration between OCR and downstream information extraction \cite{li2021trba,long2021survey}.
+
+\section{Sources}
+This report was developed from foundational and modern OCR literature covering CTC, CRNN-style recognizers, scene text systems, benchmark analyses, and OCR surveys. Full citations are listed in the reference section below.
+
+\printbibliography
+
+\end{document}
